@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chess Clock - Wake Lock</title>
+    <title>Chess Clock - High Speed Responsive</title>
+    <title>Chess Clock - High Speed Responsive</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -38,7 +43,10 @@
             height: 100vh;
             margin: 0;
             transition: background-color 0.4s ease;
+            /* Prevent browser gestures that interfere with fast tapping */
             touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .neu-button {
@@ -54,6 +62,7 @@
             color: var(--text);
             outline: none;
             flex-shrink: 0;
+            touch-action: manipulation;
         }
 
         .dark-mode .hud, .dark-mode .indiv-setting-btn {
@@ -72,6 +81,8 @@
             cursor: pointer;
             transition: background-color 0.8s ease, flex 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.5s ease;
             overflow: hidden;
+            /* Crucial for responsive tapping */
+            touch-action: manipulation;
         }
 
         .p2-rotate { transform: rotate(180deg); }
@@ -87,6 +98,7 @@
             inset: 0;
             z-index: 20;
             gap: 2vh;
+            pointer-events: none; /* Let events pass to player-area */
         }
 
         .time-text {
@@ -147,6 +159,7 @@
             z-index: 40;
             position: relative;
             background: var(--indiv-btn-bg);
+            pointer-events: auto; /* Re-enable for button */
         }
         .indiv-setting-btn.visible { opacity: 1; pointer-events: auto; transform: scale(1); }
 
@@ -157,7 +170,7 @@
         .neu-inset { background: var(--bg); box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light); border-radius: 12px; }
         
         .board-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; width: 100%; }
-        .time-chip { height: 4.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 18px; background: var(--bg); box-shadow: 4px 4px 8px var(--shadow-dark), -2px -2px 6px var(--shadow-light); cursor: pointer; transition: 0.2s; line-height: 1.1; }
+        .time-chip { height: 4.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 18px; background: var(--bg); box-shadow: 4px 4px 8px var(--shadow-dark), -2px -2px 6px var(--shadow-light); cursor: pointer; transition: 0.2s; line-height: 1.1; touch-action: manipulation; }
         .time-chip:active { box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light); transform: scale(0.98); }
         .time-chip b { font-size: 1.2rem; font-weight: 800; }
         .time-chip span { font-size: 0.75rem; font-weight: 600; opacity: 0.4; }
@@ -189,17 +202,12 @@
         .square-switch .led-dot { width: 1.4rem; height: 1.4rem; background: var(--shadow-dark); border-radius: 50%; position: absolute; top: 0.3rem; left: 0.3rem; transition: 0.3s; }
         .square-switch.on .led-dot { left: 1.8rem; background: var(--accent); }
     </style>
-
-    <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="icon.png">
 </head>
 <body>
 
     <div class="flex flex-col h-full relative" id="game-container">
         <!-- Player 2 Area -->
-        <div id="p2-area" class="player-area dimmed" style="background-color: var(--p2)" onclick="tap(2)">
+        <div id="p2-area" class="player-area dimmed" style="background-color: var(--p2)">
             <svg class="crown-backdrop" viewBox="0 0 24 24"><path d="M5 16L3 5L8.5 10L12 4L15.5 10L21 5L19 16H5M19 19C19 19.6 18.6 20 18 20H6C5.4 20 5 19.6 5 19V18H19V19Z"/></svg>
             <div class="timer-container p2-rotate">
                 <div id="p2-timer" class="time-text">05:00<span class="decimal">.0</span></div>
@@ -217,7 +225,7 @@
         </div>
 
         <!-- Player 1 Area -->
-        <div id="p1-area" class="player-area dimmed" style="background-color: var(--p1)" onclick="tap(1)">
+        <div id="p1-area" class="player-area dimmed" style="background-color: var(--p1)">
             <svg class="crown-backdrop" viewBox="0 0 24 24"><path d="M5 16L3 5L8.5 10L12 4L15.5 10L21 5L19 16H5M19 19C19 19.6 18.6 20 18 20H6C5.4 20 5 19.6 5 19V18H19V19Z"/></svg>
             <div class="timer-container">
                 <div id="p1-timer" class="time-text">05:00<span class="decimal">.0</span></div>
@@ -368,7 +376,6 @@
             }
         }
 
-        // Re-acquire lock when page is visible again
         document.addEventListener('visibilitychange', async () => {
             if (wakeLock !== null && document.visibilityState === 'visible') {
                 await requestWakeLock();
@@ -400,6 +407,35 @@
         const pastelPresets = ['#B8E2F2', '#F9D1D1', '#D4EDDA', '#FFF3CD', '#E2D1F9', '#FCE1E4', '#DAEAF6', '#E8F3D6', '#FCF4DD', '#FFE5D9'];
         let timer = null;
 
+        // Responsive Tap Implementation
+        function setupResponsiveTapping() {
+            const areas = [
+                { id: 'p1-area', player: 1 },
+                { id: 'p2-area', player: 2 }
+            ];
+
+            areas.forEach(({ id, player }) => {
+                const el = document.getElementById(id);
+                
+                // Use touchstart for immediate response
+                el.addEventListener('touchstart', (e) => {
+                    // Prevent default only if we handle the game tap logic
+                    // This avoids double-tap zoom and delays
+                    if (!state.winner) {
+                        e.preventDefault(); 
+                        tap(player);
+                    }
+                }, { passive: false });
+
+                // Fallback for desktop/mouse
+                el.addEventListener('mousedown', (e) => {
+                    // Don't trigger if it was already handled by touch
+                    if (e.pointerType === 'touch') return;
+                    tap(player);
+                });
+            });
+        }
+
         function init() {
             const container = document.getElementById('preset-container');
             pastelPresets.forEach(color => {
@@ -410,8 +446,8 @@
                 container.appendChild(dot);
             });
             draw();
-            // Request wake lock initially if supported
             requestWakeLock();
+            setupResponsiveTapping();
         }
 
         function draw() {
@@ -451,19 +487,30 @@
 
         function tap(p) {
             if (state.p1 <= 0 || state.p2 <= 0 || state.winner) return;
+            
+            // Initial Start
             if (state.active === null) {
                 playClick(1.5, 0.4);
-                state.active = p; state.paused = false;
+                state.active = p; 
+                state.paused = false;
                 document.querySelectorAll('.indiv-setting-btn').forEach(b => b.classList.remove('visible'));
                 start(); 
-                requestWakeLock(); // Ensure lock is active when game starts
+                requestWakeLock();
+                return;
             }
+
+            // Normal turn switch
             if (state.active !== p || state.paused) return;
             
             playClick(p === 1 ? 1 : 1.1);
 
-            if (p === 1) { if (state.fischer) state.p1 += state.p1_inc; state.active = 2; } 
-            else { if (state.fischer) state.p2 += state.p2_inc; state.active = 1; }
+            if (p === 1) { 
+                if (state.fischer) state.p1 += state.p1_inc; 
+                state.active = 2; 
+            } else { 
+                if (state.fischer) state.p2 += state.p2_inc; 
+                state.active = 1; 
+            }
             draw();
         }
 
@@ -494,12 +541,7 @@
             playClick(state.paused ? 1.2 : 0.8);
             state.paused = !state.paused; 
             document.getElementById('play-icon').className = state.paused ? 'fas fa-play' : 'fas fa-pause'; 
-            if (state.paused) {
-                // We keep wakeLock while app is open for chess clocks, 
-                // but one could release it here if desired.
-            } else {
-                requestWakeLock();
-            }
+            if (!state.paused) requestWakeLock();
         }
         
         function reset() {
@@ -600,12 +642,11 @@
         }
         function applyPreset(m, s, f, inc) { playClick(1.2); state.p1_base = state.p2_base = (m * 60) + s; state.p1_inc = state.p2_inc = inc; document.getElementById('cfg-m').value = m; document.getElementById('cfg-s').value = s; document.getElementById('cfg-i').value = inc; setFischerMode(f); reset(); closeSettings(); }
 
-    // PWA Service Worker Registration
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').then(() => {
-        console.log('Service Worker Registered');
-      });
-    }
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').then(() => {
+                console.log('Service Worker Registered');
+            });
+        }
 
         window.onload = init;
     </script>
