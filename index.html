@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chess Clock - Wake Lock</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --p1: #B8E2F2;
+            --p2: #F9D1D1;
+            --accent: #E2D1F9;
+            --bg: #F0F4F8;
+            --shadow-light: #FFFFFF;
+            --shadow-dark: #C1CCD8;
+            --text: #486581;
+            --panel-bg: rgba(240, 244, 248, 0.98);
+            --hud-bg: var(--bg);
+            --indiv-btn-bg: var(--bg);
+        }
+
+        .dark-mode {
+            --bg: #102A43;
+            --shadow-light: #243B53;
+            --shadow-dark: #000810;
+            --text: #D9E2EC;
+            --panel-bg: rgba(16, 42, 67, 0.98);
+            --hud-bg: #243B53;
+            --indiv-btn-bg: #243B53;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            margin: 0;
+            transition: background-color 0.4s ease;
+            touch-action: none;
+        }
+
+        .neu-button {
+            background: var(--bg);
+            box-shadow: 6px 6px 14px var(--shadow-dark), -6px -6px 14px var(--shadow-light);
+            border: 1.5px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            color: var(--text);
+            outline: none;
+            flex-shrink: 0;
+        }
+
+        .dark-mode .hud, .dark-mode .indiv-setting-btn {
+            background: var(--hud-bg);
+            box-shadow: none;
+            border: none;
+        }
+
+        .player-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: pointer;
+            transition: background-color 0.8s ease, flex 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.5s ease;
+            overflow: hidden;
+        }
+
+        .p2-rotate { transform: rotate(180deg); }
+
+        .timer-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            inset: 0;
+            z-index: 20;
+            gap: 2vh;
+        }
+
+        .time-text {
+            font-size: min(25vw, 40vh); 
+            font-weight: 900;
+            color: white;
+            text-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            font-variant-numeric: tabular-nums;
+            display: flex;
+            align-items: baseline;
+            letter-spacing: -0.04em;
+            transition: opacity 0.8s ease;
+            line-height: 0.8;
+        }
+
+        .decimal { font-size: 0.4em; opacity: 0.8; margin-left: 0.02em; font-weight: 700; }
+
+        .active-turn, .game-over-active { z-index: 30; opacity: 1 !important; }
+        .dimmed { opacity: 0.4; }
+
+        .crown-backdrop {
+            position: absolute;
+            width: 90%;
+            height: 90%;
+            fill: white;
+            opacity: 0;
+            z-index: 10;
+            pointer-events: none;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1));
+            transition: all 1.2s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        #p1-area .crown-backdrop { transform: scale(0.5) translateY(50px); }
+        #p1-area.winner .crown-backdrop { opacity: 0.25; transform: scale(1.1) translateY(0); }
+
+        #p2-area .crown-backdrop { transform: rotate(180deg) scale(0.5) translateY(50px); }
+        #p2-area.winner .crown-backdrop { opacity: 0.25; transform: rotate(180deg) scale(1.1) translateY(0); }
+
+        .loser .time-text { opacity: 0.3; }
+
+        .hud {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 100; display: flex; align-items: center; gap: 1.5rem;
+            padding: 0.8rem 2.2rem; border-radius: 60px; background: var(--hud-bg);
+            box-shadow: 10px 10px 20px var(--shadow-dark), -10px -10px 20px var(--shadow-light);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.5s ease;
+            opacity: 1 !important;
+        }
+
+        .btn-main { width: 4.5rem; height: 4.5rem; font-size: 1.4rem; }
+        .btn-sub { width: 3rem; height: 3rem; font-size: 0.9rem; }
+
+        .indiv-setting-btn {
+            width: min(12vw, 8vh); height: min(12vw, 8vh); font-size: 1rem;
+            transition: all 0.3s ease;
+            opacity: 0; pointer-events: none; transform: scale(0.8);
+            z-index: 40;
+            position: relative;
+            background: var(--indiv-btn-bg);
+        }
+        .indiv-setting-btn.visible { opacity: 1; pointer-events: auto; transform: scale(1); }
+
+        .panel { position: fixed; inset: 0; background: var(--panel-bg); z-index: 500; display: none; padding: 1rem; overflow-y: auto; }
+        .panel.active { display: flex; flex-direction: column; align-items: center; }
+        .settings-content { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 1.2rem; padding-bottom: 2rem; }
+        .neu-flat { background: var(--bg); box-shadow: 4px 4px 12px var(--shadow-dark), -4px -4px 12px var(--shadow-light); border-radius: 24px; }
+        .neu-inset { background: var(--bg); box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light); border-radius: 12px; }
+        
+        .board-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; width: 100%; }
+        .time-chip { height: 4.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 18px; background: var(--bg); box-shadow: 4px 4px 8px var(--shadow-dark), -2px -2px 6px var(--shadow-light); cursor: pointer; transition: 0.2s; line-height: 1.1; }
+        .time-chip:active { box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light); transform: scale(0.98); }
+        .time-chip b { font-size: 1.2rem; font-weight: 800; }
+        .time-chip span { font-size: 0.75rem; font-weight: 600; opacity: 0.4; }
+        
+        input[type="number"] { background: transparent; border: none; outline: none; font-weight: 800; color: var(--text); font-size: 1.8rem; width: 4.5rem; text-align: center; }
+        input[type="range"] { width: 100%; height: 8px; border-radius: 5px; background: var(--shadow-dark); outline: none; -webkit-appearance: none; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); cursor: pointer; box-shadow: 0 0 10px rgba(0,0,0,0.1); border: 3px solid white; }
+
+        .lab-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 550; display: none; opacity: 0; transition: opacity 0.4s ease; backdrop-filter: blur(4px); }
+        .lab-backdrop.active { display: block; opacity: 1; }
+        
+        .lab-modal { 
+            position: fixed; bottom: 0; left: 0; right: 0; 
+            background: var(--bg); z-index: 600; 
+            padding: 2rem 1.5rem 3rem 1.5rem; 
+            display: none; border-radius: 40px 40px 0 0; 
+            box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.15); 
+            transform: translateY(100%); 
+            transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1); 
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .lab-modal.active { display: block; transform: translateY(0); }
+        .modal-section { margin-bottom: 2rem; }
+
+        .action-btn { width: 100%; padding: 1.2rem 0; border-radius: 24px; font-weight: 900; color: white; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+
+        .square-switch { width: 3.5rem; height: 2rem; background: var(--bg); box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light); border-radius: 20px; position: relative; cursor: pointer; transition: 0.3s; }
+        .square-switch .led-dot { width: 1.4rem; height: 1.4rem; background: var(--shadow-dark); border-radius: 50%; position: absolute; top: 0.3rem; left: 0.3rem; transition: 0.3s; }
+        .square-switch.on .led-dot { left: 1.8rem; background: var(--accent); }
+    </style>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon.png">
+</head>
+<body>
+
+    <div class="flex flex-col h-full relative" id="game-container">
+        <!-- Player 2 Area -->
+        <div id="p2-area" class="player-area dimmed" style="background-color: var(--p2)" onclick="tap(2)">
+            <svg class="crown-backdrop" viewBox="0 0 24 24"><path d="M5 16L3 5L8.5 10L12 4L15.5 10L21 5L19 16H5M19 19C19 19.6 18.6 20 18 20H6C5.4 20 5 19.6 5 19V18H19V19Z"/></svg>
+            <div class="timer-container p2-rotate">
+                <div id="p2-timer" class="time-text">05:00<span class="decimal">.0</span></div>
+                <button id="p2-indiv-btn" class="neu-button indiv-setting-btn visible" onclick="openIndivSettings(event, 2)">
+                    <i class="fas fa-sliders-h"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Central HUD -->
+        <div id="hud" class="hud">
+            <button class="neu-button btn-sub" onclick="reset()"><i class="fas fa-redo"></i></button>
+            <button class="neu-button btn-main" onclick="togglePause()"><i id="play-icon" class="fas fa-play"></i></button>
+            <button class="neu-button btn-sub" onclick="openSettings()"><i class="fas fa-cog"></i></button>
+        </div>
+
+        <!-- Player 1 Area -->
+        <div id="p1-area" class="player-area dimmed" style="background-color: var(--p1)" onclick="tap(1)">
+            <svg class="crown-backdrop" viewBox="0 0 24 24"><path d="M5 16L3 5L8.5 10L12 4L15.5 10L21 5L19 16H5M19 19C19 19.6 18.6 20 18 20H6C5.4 20 5 19.6 5 19V18H19V19Z"/></svg>
+            <div class="timer-container">
+                <div id="p1-timer" class="time-text">05:00<span class="decimal">.0</span></div>
+                <button id="p1-indiv-btn" class="neu-button indiv-setting-btn visible" onclick="openIndivSettings(event, 1)">
+                    <i class="fas fa-sliders-h"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Settings Panel -->
+    <div id="panel-settings" class="panel">
+        <div class="w-full max-w-[480px] flex justify-between items-center mb-6 mt-4 px-2">
+            <button class="neu-button w-11 h-11" onclick="closeSettings()"><i class="fas fa-times"></i></button>
+            <div class="flex gap-4">
+                <button class="neu-button w-11 h-11" onclick="toggleOpt('sound')">
+                    <i id="snd-icon" class="fas fa-volume-up"></i>
+                </button>
+                <button class="neu-button w-11 h-11" onclick="openLab(3)">
+                    <i id="ui-pal-icon" class="fas fa-palette" style="color:var(--accent)"></i>
+                </button>
+                <button class="neu-button w-11 h-11" onclick="toggleTheme()">
+                    <i id="theme-btn" class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+        <div class="settings-content">
+            <div class="neu-flat p-4 space-y-3">
+                <div class="board-grid">
+                    <div class="time-chip" onclick="applyPreset(1,0,false,0)"><b>1</b><span>+0</span></div>
+                    <div class="time-chip" onclick="applyPreset(1,0,true,1)"><b>1</b><span>+1</span></div>
+                    <div class="time-chip" onclick="applyPreset(2,0,false,0)"><b>2</b><span>+0</span></div>
+                    <div class="time-chip" onclick="applyPreset(2,0,true,1)"><b>2</b><span>+1</span></div>
+                </div>
+                <div class="board-grid">
+                    <div class="time-chip" onclick="applyPreset(3,0,false,0)"><b>3</b><span>+0</span></div>
+                    <div class="time-chip" onclick="applyPreset(3,0,true,2)"><b>3</b><span>+2</span></div>
+                    <div class="time-chip" onclick="applyPreset(5,0,false,0)"><b>5</b><span>+0</span></div>
+                    <div class="time-chip" onclick="applyPreset(5,0,true,3)"><b>5</b><span>+3</span></div>
+                </div>
+                <div class="board-grid">
+                    <div class="time-chip" onclick="applyPreset(10,0,false,0)"><b>10</b><span>+0</span></div>
+                    <div class="time-chip" onclick="applyPreset(10,0,true,5)"><b>10</b><span>+5</span></div>
+                    <div class="time-chip" onclick="applyPreset(15,0,false,0)"><b>15</b><span>+0</span></div>
+                    <div class="time-chip" onclick="applyPreset(15,0,true,5)"><b>15</b><span>+5</span></div>
+                </div>
+                <div class="board-grid">
+                    <div class="time-chip" onclick="applyPreset(25,0,false,0)"><b>25</b><span>+0</span></div>
+                    <div class="time-chip" onclick="applyPreset(30,0,false,0)"><b>30</b><span>+0</span></div>
+                    <div class="time-chip" onclick="applyPreset(30,0,true,20)"><b>30</b><span>+20</span></div>
+                    <div class="time-chip" onclick="applyPreset(60,0,false,0)"><b>60</b><span>+0</span></div>
+                </div>
+            </div>
+            
+            <div class="neu-flat p-6 flex flex-col gap-6">
+                <div class="flex items-center justify-center gap-4">
+                    <div class="neu-inset px-5 py-2 flex-1 flex flex-col items-center">
+                        <input type="number" id="cfg-m" value="5">
+                    </div>
+                    <span class="opacity-10 text-2xl font-black">:</span>
+                    <div class="neu-inset px-5 py-2 flex-1 flex flex-col items-center">
+                        <input type="number" id="cfg-s" value="0">
+                    </div>
+                </div>
+                <div class="flex flex-col gap-4">
+                    <div class="flex items-center justify-between px-2">
+                        <i class="fas fa-bolt opacity-30"></i>
+                        <div id="fis-sw" class="square-switch" onclick="toggleFischer()"><div class="led-dot"></div></div>
+                    </div>
+                    <div id="f-ctrl" class="opacity-10 pointer-events-none transition-all duration-300 px-1">
+                        <div class="flex justify-end mb-2"><span id="inc-l" class="text-xl font-black">0</span></div>
+                        <input type="range" id="cfg-i" min="0" max="60" value="0" oninput="document.getElementById('inc-l').innerText=this.value">
+                    </div>
+                </div>
+                <button class="action-btn" style="background:var(--accent)" onclick="applyManualSettings()"><i class="fas fa-check"></i></button>
+            </div>
+            <div class="neu-flat p-5 flex justify-center gap-12 items-center">
+                <div onclick="openLab(1)" id="cp1" class="w-12 h-12 rounded-full border-4 border-white shadow-md cursor-pointer" style="background:var(--p1)"></div>
+                <div onclick="openLab(2)" id="cp2" class="w-12 h-12 rounded-full border-4 border-white shadow-md cursor-pointer" style="background:var(--p2)"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="lab-bg" class="lab-backdrop" onclick="closeLab(); closeIndiv();"></div>
+    
+    <!-- Individual Settings Modal -->
+    <div id="indiv-panel" class="lab-modal">
+        <div class="modal-section">
+            <div class="flex items-center gap-4 justify-center">
+                <div class="neu-inset px-6 py-3 flex-1 flex flex-col items-center">
+                    <input type="number" id="indiv-m" value="5">
+                </div>
+                <span class="opacity-10 text-2xl font-black">:</span>
+                <div class="neu-inset px-6 py-3 flex-1 flex flex-col items-center">
+                    <input type="number" id="indiv-s" value="0">
+                </div>
+            </div>
+        </div>
+        <div class="modal-section">
+            <div class="flex justify-end mb-2">
+                <span id="indiv-inc-l" class="text-xl font-black">0</span>
+            </div>
+            <div class="neu-inset p-6">
+                <input type="range" id="indiv-i" min="0" max="60" value="0" oninput="document.getElementById('indiv-inc-l').innerText=this.value">
+            </div>
+        </div>
+        <button class="action-btn" id="indiv-apply-btn" style="background:var(--accent)" onclick="applyIndivSettings()"><i class="fas fa-check"></i></button>
+    </div>
+
+    <!-- Color Lab Modal -->
+    <div id="lab" class="lab-modal">
+        <div class="modal-section">
+            <div class="grid grid-cols-5 gap-3" id="preset-container"></div>
+        </div>
+        <div class="modal-section flex flex-col gap-6">
+            <div class="flex flex-col gap-8 px-2">
+                <input type="range" id="lh" min="0" max="360" value="210" oninput="syncLab(true)">
+                <input type="range" id="ls" min="0" max="100" value="100" oninput="syncLab(true)">
+            </div>
+            <div class="flex items-center justify-between neu-inset p-5 mt-4">
+                <div id="lp" class="w-12 h-12 rounded-full border-4 border-white shadow-sm"></div>
+                <span id="lx-display" class="font-mono text-lg font-bold opacity-40">#B8E2F2</span>
+            </div>
+        </div>
+        <button class="action-btn" style="background:var(--accent)" onclick="applyLab()"><i class="fas fa-check"></i></button>
+    </div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let wakeLock = null;
+
+        // --- Wake Lock API Implementation ---
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.error(`${err.name}, ${err.message}`);
+            }
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock !== null) {
+                wakeLock.release();
+                wakeLock = null;
+            }
+        }
+
+        // Re-acquire lock when page is visible again
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                await requestWakeLock();
+            }
+        });
+
+        function playClick(pitch = 1, volume = 0.3) {
+            if (!state.sound) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(800 * pitch, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100 * pitch, audioCtx.currentTime + 0.05);
+
+            gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.05);
+        }
+
+        let state = { p1: 300, p2: 300, p1_base: 300, p2_base: 300, p1_inc: 0, p2_inc: 0, fischer: false, active: null, paused: true, sound: true, dark: false, target: 1, indiv_target: 1, winner: null };
+        const pastelPresets = ['#B8E2F2', '#F9D1D1', '#D4EDDA', '#FFF3CD', '#E2D1F9', '#FCE1E4', '#DAEAF6', '#E8F3D6', '#FCF4DD', '#FFE5D9'];
+        let timer = null;
+
+        function init() {
+            const container = document.getElementById('preset-container');
+            pastelPresets.forEach(color => {
+                const dot = document.createElement('div');
+                dot.className = 'w-full aspect-square rounded-full border-2 border-transparent shadow-sm cursor-pointer';
+                dot.style.backgroundColor = color;
+                dot.onclick = () => { playClick(1.2); updateLabFromHex(color); };
+                container.appendChild(dot);
+            });
+            draw();
+            // Request wake lock initially if supported
+            requestWakeLock();
+        }
+
+        function draw() {
+            const fmt = (t) => {
+                const m = Math.floor(t / 60), s = Math.floor(t % 60), d = Math.floor((t % 1) * 10);
+                return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}<span class="decimal">.${d}</span>`;
+            };
+            document.getElementById('p1-timer').innerHTML = fmt(state.p1);
+            document.getElementById('p2-timer').innerHTML = fmt(state.p2);
+
+            const p1 = document.getElementById('p1-area');
+            const p2 = document.getElementById('p2-area');
+
+            if (state.winner) {
+                const winnerColor = getComputedStyle(document.documentElement).getPropertyValue(state.winner === 1 ? '--p1' : '--p2');
+                p1.style.backgroundColor = winnerColor;
+                p2.style.backgroundColor = winnerColor;
+                p1.classList.toggle('winner', state.winner === 1);
+                p1.classList.toggle('loser', state.winner === 2);
+                p2.classList.toggle('winner', state.winner === 2);
+                p2.classList.toggle('loser', state.winner === 1);
+                p1.classList.add('game-over-active');
+                p2.classList.add('game-over-active');
+                p1.classList.remove('dimmed');
+                p2.classList.remove('dimmed');
+            } else {
+                p1.style.backgroundColor = 'var(--p1)';
+                p2.style.backgroundColor = 'var(--p2)';
+                p1.classList.remove('winner', 'loser', 'game-over-active');
+                p2.classList.remove('winner', 'loser', 'game-over-active');
+                p1.classList.toggle('active-turn', state.active === 1);
+                p1.classList.toggle('dimmed', state.active !== 1 && state.active !== null);
+                p2.classList.toggle('active-turn', state.active === 2);
+                p2.classList.toggle('dimmed', state.active !== 2 && state.active !== null);
+            }
+        }
+
+        function tap(p) {
+            if (state.p1 <= 0 || state.p2 <= 0 || state.winner) return;
+            if (state.active === null) {
+                playClick(1.5, 0.4);
+                state.active = p; state.paused = false;
+                document.querySelectorAll('.indiv-setting-btn').forEach(b => b.classList.remove('visible'));
+                start(); 
+                requestWakeLock(); // Ensure lock is active when game starts
+            }
+            if (state.active !== p || state.paused) return;
+            
+            playClick(p === 1 ? 1 : 1.1);
+
+            if (p === 1) { if (state.fischer) state.p1 += state.p1_inc; state.active = 2; } 
+            else { if (state.fischer) state.p2 += state.p2_inc; state.active = 1; }
+            draw();
+        }
+
+        function start() {
+            if (timer) clearInterval(timer);
+            timer = setInterval(() => {
+                if (state.paused || state.winner) return;
+                if (state.active === 1) state.p1 = Math.max(0, state.p1 - 0.1);
+                else if (state.active === 2) state.p2 = Math.max(0, state.p2 - 0.1);
+                if (state.p1 <= 0) endGame(2);
+                else if (state.p2 <= 0) endGame(1);
+                draw();
+            }, 100);
+            document.getElementById('play-icon').className = 'fas fa-pause';
+        }
+
+        function endGame(w) { 
+            clearInterval(timer); 
+            state.winner = w; 
+            state.paused = true; 
+            playClick(0.5, 0.5);
+            draw(); 
+        }
+
+        function togglePause() { 
+            if (state.winner) return; 
+            if (state.active === null) return tap(1); 
+            playClick(state.paused ? 1.2 : 0.8);
+            state.paused = !state.paused; 
+            document.getElementById('play-icon').className = state.paused ? 'fas fa-play' : 'fas fa-pause'; 
+            if (state.paused) {
+                // We keep wakeLock while app is open for chess clocks, 
+                // but one could release it here if desired.
+            } else {
+                requestWakeLock();
+            }
+        }
+        
+        function reset() {
+            playClick(0.7);
+            clearInterval(timer);
+            state.p1 = state.p1_base; state.p2 = state.p2_base;
+            state.active = null; state.paused = true; state.winner = null;
+            document.getElementById('play-icon').className = 'fas fa-play';
+            document.querySelectorAll('.indiv-setting-btn').forEach(b => b.classList.add('visible'));
+            draw();
+        }
+
+        function openSettings() { 
+            playClick(1.1);
+            if (!state.paused) togglePause(); 
+            document.getElementById('panel-settings').classList.add('active'); 
+        }
+        function closeSettings() { 
+            playClick(0.9);
+            document.getElementById('panel-settings').classList.remove('active'); 
+        }
+        function applyManualSettings() {
+            playClick(1.3);
+            const m = parseInt(document.getElementById('cfg-m').value) || 0;
+            const s = parseInt(document.getElementById('cfg-s').value) || 0;
+            const inc = state.fischer ? (parseInt(document.getElementById('cfg-i').value) || 0) : 0;
+            const newBase = (m * 60) + s;
+            if (newBase <= 0) return;
+            state.p1_base = state.p2_base = newBase;
+            state.p1_inc = state.p2_inc = inc;
+            reset(); closeSettings();
+        }
+
+        function openIndivSettings(e, p) {
+            e.stopPropagation();
+            playClick(1.1);
+            state.indiv_target = p;
+            const currentBase = (p === 1) ? state.p1_base : state.p2_base;
+            const currentInc = (p === 1) ? state.p1_inc : state.p2_inc;
+            document.getElementById('indiv-m').value = Math.floor(currentBase / 60);
+            document.getElementById('indiv-s').value = currentBase % 60;
+            document.getElementById('indiv-i').value = currentInc;
+            document.getElementById('indiv-inc-l').innerText = currentInc;
+            document.getElementById('indiv-panel').style.display = 'block';
+            document.getElementById('lab-bg').classList.add('active');
+            setTimeout(() => document.getElementById('indiv-panel').classList.add('active'), 10);
+        }
+        function applyIndivSettings() {
+            playClick(1.3);
+            const m = parseInt(document.getElementById('indiv-m').value) || 0;
+            const s = parseInt(document.getElementById('indiv-s').value) || 0;
+            const inc = parseInt(document.getElementById('indiv-i').value) || 0;
+            const newBase = (m * 60) + s;
+            if (state.indiv_target === 1) { state.p1_base = newBase; state.p1_inc = inc; state.p1 = newBase; }
+            else { state.p2_base = newBase; state.p2_inc = inc; state.p2 = newBase; }
+            if (inc > 0) setFischerMode(true);
+            draw(); closeIndiv();
+        }
+        function closeIndiv() { playClick(0.9); document.getElementById('indiv-panel').classList.remove('active'); document.getElementById('lab-bg').classList.remove('active'); setTimeout(() => document.getElementById('indiv-panel').style.display = 'none', 400); }
+
+        function setFischerMode(isActive) { state.fischer = isActive; document.getElementById('fis-sw').classList.toggle('on', isActive); document.getElementById('f-ctrl').style.opacity = isActive ? '1' : '0.1'; document.getElementById('f-ctrl').style.pointerEvents = isActive ? 'auto' : 'none'; }
+        function toggleFischer() { playClick(state.fischer ? 0.8 : 1.2); setFischerMode(!state.fischer); }
+        function toggleTheme() { playClick(state.dark ? 1.4 : 0.6); state.dark = !state.dark; document.body.classList.toggle('dark-mode', state.dark); document.getElementById('theme-btn').className = state.dark ? 'fas fa-sun' : 'fas fa-moon'; }
+        function toggleOpt(k) { playClick(state[k] ? 0.7 : 1.3); state[k] = !state[k]; if (k === 'sound') document.getElementById('snd-icon').className = state.sound ? 'fas fa-volume-up' : 'fas fa-volume-mute'; }
+
+        function openLab(t) { playClick(1.1); state.target = t; document.getElementById('lab').style.display = 'block'; document.getElementById('lab-bg').classList.add('active'); setTimeout(() => document.getElementById('lab').classList.add('active'), 10); }
+        function closeLab() { playClick(0.9); document.getElementById('lab').classList.remove('active'); document.getElementById('lab-bg').classList.remove('active'); setTimeout(() => document.getElementById('lab').style.display = 'none', 400); }
+        
+        function hslToHex(h, s, l) {
+            l /= 100; const a = s * Math.min(l, 1 - l) / 100;
+            const f = n => { const k = (n + h / 30) % 12; const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1); return Math.round(255 * color).toString(16).padStart(2, '0'); };
+            return `#${f(0)}${f(8)}${f(4)}`.toUpperCase();
+        }
+        function hexToHsl(hex) {
+            let r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+            let max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h, s, l = (max + min) / 2;
+            if (max == min) h = s = 0;
+            else { let d = max - min; s = l > 0.5 ? d / (2 - max - min) : d / (max + min); switch (max) { case r: h = (g - b) / d + (g < b ? 6 : 0); break; case g: h = (b - r) / d + 2; break; case b: h = (r - g) / d + 4; break; } h /= 6; }
+            return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
+        }
+        function syncLab(fromSliders) {
+            const h = document.getElementById('lh').value, s = document.getElementById('ls').value;
+            const hex = hslToHex(h, s, 85);
+            document.getElementById('lp').style.background = hex; document.getElementById('lx-display').innerText = hex;
+        }
+        function updateLabFromHex(hex) {
+            const [h, s, l] = hexToHsl(hex);
+            document.getElementById('lh').value = h; document.getElementById('ls').value = s; syncLab(false);
+        }
+        function applyLab() {
+            playClick(1.4);
+            const hex = document.getElementById('lx-display').innerText;
+            if (state.target === 1) { document.documentElement.style.setProperty('--p1', hex); document.getElementById('cp1').style.background = hex; }
+            else if (state.target === 2) { document.documentElement.style.setProperty('--p2', hex); document.getElementById('cp2').style.background = hex; }
+            else { document.documentElement.style.setProperty('--accent', hex); document.getElementById('ui-pal-icon').style.color = hex; }
+            draw(); closeLab();
+        }
+        function applyPreset(m, s, f, inc) { playClick(1.2); state.p1_base = state.p2_base = (m * 60) + s; state.p1_inc = state.p2_inc = inc; document.getElementById('cfg-m').value = m; document.getElementById('cfg-s').value = s; document.getElementById('cfg-i').value = inc; setFischerMode(f); reset(); closeSettings(); }
+
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').then(() => {
+        console.log('Service Worker Registered');
+      });
+    }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
